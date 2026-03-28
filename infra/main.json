@@ -1,0 +1,1136 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "languageVersion": "2.0",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.41.2.15936",
+      "templateHash": "6886631384105371214"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for all resources."
+      }
+    },
+    "prefix": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource name prefix (e.g., mb-idp, proj1-idp)."
+      }
+    },
+    "environment": {
+      "type": "string",
+      "defaultValue": "dev",
+      "allowedValues": [
+        "dev",
+        "test",
+        "prod"
+      ],
+      "metadata": {
+        "description": "Environment name (dev/test/prod). Used for naming + tags."
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {},
+      "metadata": {
+        "description": "Optional tags applied to all resources."
+      }
+    },
+    "apiImage": {
+      "type": "string",
+      "metadata": {
+        "description": "Container image for the .NET API (fully qualified, e.g. myacr.azurecr.io/project1-api:1.0.0)."
+      }
+    },
+    "pipelineImage": {
+      "type": "string",
+      "metadata": {
+        "description": "Container image for the Python pipeline job (fully qualified, e.g. myacr.azurecr.io/idp-pipeline:1.0.0)."
+      }
+    },
+    "cosmosDatabaseName": {
+      "type": "string",
+      "defaultValue": "idp",
+      "metadata": {
+        "description": "Cosmos DB database name."
+      }
+    },
+    "cosmosContainerName": {
+      "type": "string",
+      "defaultValue": "documents",
+      "metadata": {
+        "description": "Cosmos DB container name."
+      }
+    },
+    "cosmosPartitionKeyPath": {
+      "type": "string",
+      "defaultValue": "/partitionKey",
+      "metadata": {
+        "description": "Cosmos DB partition key path."
+      }
+    },
+    "cosmosFreeTier": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Enable Cosmos DB free tier where available."
+      }
+    },
+    "cosmosConsistencyLevel": {
+      "type": "string",
+      "defaultValue": "Session",
+      "allowedValues": [
+        "Strong",
+        "BoundedStaleness",
+        "Session",
+        "ConsistentPrefix",
+        "Eventual"
+      ],
+      "metadata": {
+        "description": "Cosmos DB consistency level."
+      }
+    },
+    "azureOpenAIApiVersion": {
+      "type": "string",
+      "defaultValue": "2024-06-01",
+      "metadata": {
+        "description": "Azure OpenAI API version used by the Python pipeline."
+      }
+    },
+    "azureOpenAIDeploymentName": {
+      "type": "string",
+      "defaultValue": "gpt-4o",
+      "metadata": {
+        "description": "Azure OpenAI deployment name expected by the Python pipeline (AZURE_OPENAI_DEPLOYMENT)."
+      }
+    },
+    "azureOpenAIModelName": {
+      "type": "string",
+      "defaultValue": "gpt-4o",
+      "metadata": {
+        "description": "Azure OpenAI model name for the deployment (varies by region/availability)."
+      }
+    },
+    "azureOpenAIModelVersion": {
+      "type": "string",
+      "defaultValue": "2024-08-06",
+      "metadata": {
+        "description": "Azure OpenAI model version for the deployment. Optional; set to match your region quota/model catalog."
+      }
+    },
+    "documentIntelligenceModelId": {
+      "type": "string",
+      "defaultValue": "prebuilt-document",
+      "metadata": {
+        "description": "Document Intelligence model ID used by the pipeline (e.g. prebuilt-document)."
+      }
+    },
+    "logAnalyticsRetentionDays": {
+      "type": "int",
+      "defaultValue": 30,
+      "minValue": 30,
+      "maxValue": 730,
+      "metadata": {
+        "description": "Log Analytics retention in days."
+      }
+    },
+    "createAzureOpenAIDeployment": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Whether to create the Azure OpenAI model deployment via IaC. If false, create it manually and just set AZURE_OPENAI_DEPLOYMENT."
+      }
+    }
+  },
+  "variables": {
+    "nameSuffix": "[format('{0}', parameters('environment'))]",
+    "baseName": "[toLower(replace(format('{0}-{1}', parameters('prefix'), variables('nameSuffix')), '--', '-'))]",
+    "logWsName": "[format('{0}-law', variables('baseName'))]",
+    "caeName": "[format('{0}-cae', variables('baseName'))]",
+    "cosmosName": "[toLower(replace(format('{0}-cosmos', variables('baseName')), '-', ''))]",
+    "diName": "[format('{0}-di', variables('baseName'))]",
+    "aoaiName": "[format('{0}-aoai', variables('baseName'))]",
+    "apiAppName": "[format('{0}-api', variables('baseName'))]",
+    "pipelineJobName": "[format('{0}-pipeline', variables('baseName'))]"
+  },
+  "resources": {
+    "law": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('law-{0}', uniqueString(resourceGroup().id, variables('baseName')))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "name": {
+            "value": "[variables('logWsName')]"
+          },
+          "environment": {
+            "value": "[parameters('environment')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "retentionInDays": {
+            "value": "[parameters('logAnalyticsRetentionDays')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.41.2.15936",
+              "templateHash": "12584313311797048110"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "retentionInDays": {
+              "type": "int",
+              "defaultValue": 30
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.OperationalInsights/workspaces",
+              "apiVersion": "2023-09-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[union(parameters('tags'), createObject('env', parameters('environment'), 'app', 'project1-idp'))]",
+              "properties": {
+                "retentionInDays": "[parameters('retentionInDays')]",
+                "sku": {
+                  "name": "PerGB2018"
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('name'))]"
+            },
+            "customerId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', parameters('name')), '2023-09-01').customerId]"
+            },
+            "sharedKey": {
+              "type": "string",
+              "value": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', parameters('name')), '2023-09-01').primarySharedKey]"
+            }
+          }
+        }
+      }
+    },
+    "cae": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('cae-{0}', uniqueString(resourceGroup().id, variables('baseName')))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "name": {
+            "value": "[variables('caeName')]"
+          },
+          "environment": {
+            "value": "[parameters('environment')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "logAnalyticsCustomerId": {
+            "value": "[reference('law').outputs.customerId.value]"
+          },
+          "logAnalyticsSharedKey": {
+            "value": "[reference('law').outputs.sharedKey.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.41.2.15936",
+              "templateHash": "5573617994216566223"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "logAnalyticsCustomerId": {
+              "type": "string"
+            },
+            "logAnalyticsSharedKey": {
+              "type": "securestring"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.App/managedEnvironments",
+              "apiVersion": "2024-03-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[union(parameters('tags'), createObject('env', parameters('environment'), 'app', 'project1-idp'))]",
+              "properties": {
+                "appLogsConfiguration": {
+                  "destination": "log-analytics",
+                  "logAnalyticsConfiguration": {
+                    "customerId": "[parameters('logAnalyticsCustomerId')]",
+                    "sharedKey": "[parameters('logAnalyticsSharedKey')]"
+                  }
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.App/managedEnvironments', parameters('name'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "law"
+      ]
+    },
+    "cosmos": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('cosmos-{0}', uniqueString(resourceGroup().id, variables('baseName')))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "accountName": {
+            "value": "[variables('cosmosName')]"
+          },
+          "environment": {
+            "value": "[parameters('environment')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "databaseName": {
+            "value": "[parameters('cosmosDatabaseName')]"
+          },
+          "containerName": {
+            "value": "[parameters('cosmosContainerName')]"
+          },
+          "partitionKeyPath": {
+            "value": "[parameters('cosmosPartitionKeyPath')]"
+          },
+          "freeTier": {
+            "value": "[parameters('cosmosFreeTier')]"
+          },
+          "consistencyLevel": {
+            "value": "[parameters('cosmosConsistencyLevel')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.41.2.15936",
+              "templateHash": "10455371676696434333"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "accountName": {
+              "type": "string"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "databaseName": {
+              "type": "string",
+              "defaultValue": "idp"
+            },
+            "containerName": {
+              "type": "string",
+              "defaultValue": "documents"
+            },
+            "partitionKeyPath": {
+              "type": "string",
+              "defaultValue": "/partitionKey"
+            },
+            "freeTier": {
+              "type": "bool",
+              "defaultValue": true
+            },
+            "consistencyLevel": {
+              "type": "string",
+              "defaultValue": "Session"
+            }
+          },
+          "resources": {
+            "cosmos": {
+              "type": "Microsoft.DocumentDB/databaseAccounts",
+              "apiVersion": "2024-05-15",
+              "name": "[parameters('accountName')]",
+              "location": "[parameters('location')]",
+              "tags": "[union(parameters('tags'), createObject('env', parameters('environment'), 'app', 'project1-idp'))]",
+              "kind": "GlobalDocumentDB",
+              "properties": {
+                "databaseAccountOfferType": "Standard",
+                "enableFreeTier": "[parameters('freeTier')]",
+                "consistencyPolicy": {
+                  "defaultConsistencyLevel": "[parameters('consistencyLevel')]"
+                },
+                "locations": [
+                  {
+                    "locationName": "[parameters('location')]",
+                    "failoverPriority": 0,
+                    "isZoneRedundant": false
+                  }
+                ],
+                "capabilities": [
+                  {
+                    "name": "EnableServerless"
+                  }
+                ]
+              }
+            },
+            "db": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+              "apiVersion": "2024-05-15",
+              "name": "[format('{0}/{1}', parameters('accountName'), parameters('databaseName'))]",
+              "properties": {
+                "resource": {
+                  "id": "[parameters('databaseName')]"
+                }
+              },
+              "dependsOn": [
+                "cosmos"
+              ]
+            },
+            "container": {
+              "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+              "apiVersion": "2024-05-15",
+              "name": "[format('{0}/{1}/{2}', parameters('accountName'), parameters('databaseName'), parameters('containerName'))]",
+              "properties": {
+                "resource": {
+                  "id": "[parameters('containerName')]",
+                  "partitionKey": {
+                    "paths": [
+                      "[parameters('partitionKeyPath')]"
+                    ],
+                    "kind": "Hash"
+                  },
+                  "indexingPolicy": {
+                    "indexingMode": "consistent",
+                    "automatic": true,
+                    "includedPaths": [
+                      {
+                        "path": "/*"
+                      }
+                    ],
+                    "excludedPaths": [
+                      {
+                        "path": "/\"_etag\"/?"
+                      }
+                    ]
+                  }
+                }
+              },
+              "dependsOn": [
+                "cosmos",
+                "db"
+              ]
+            }
+          },
+          "outputs": {
+            "accountId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName'))]"
+            },
+            "endpoint": {
+              "type": "string",
+              "value": "[reference('cosmos').documentEndpoint]"
+            },
+            "primaryKey": {
+              "type": "securestring",
+              "value": "[listKeys(resourceId('Microsoft.DocumentDB/databaseAccounts', parameters('accountName')), '2024-05-15').primaryMasterKey]"
+            },
+            "database": {
+              "type": "string",
+              "value": "[parameters('databaseName')]"
+            },
+            "containerNameOut": {
+              "type": "string",
+              "value": "[parameters('containerName')]"
+            }
+          }
+        }
+      }
+    },
+    "di": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('di-{0}', uniqueString(resourceGroup().id, variables('baseName')))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "name": {
+            "value": "[variables('diName')]"
+          },
+          "environment": {
+            "value": "[parameters('environment')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.41.2.15936",
+              "templateHash": "4209234836836848377"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            }
+          },
+          "resources": {
+            "di": {
+              "type": "Microsoft.CognitiveServices/accounts",
+              "apiVersion": "2024-04-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[union(parameters('tags'), createObject('env', parameters('environment'), 'app', 'project1-idp'))]",
+              "kind": "FormRecognizer",
+              "sku": {
+                "name": "S0"
+              },
+              "properties": {
+                "publicNetworkAccess": "Enabled"
+              }
+            }
+          },
+          "outputs": {
+            "id": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('name'))]"
+            },
+            "endpoint": {
+              "type": "string",
+              "value": "[reference('di').endpoint]"
+            },
+            "key1": {
+              "type": "securestring",
+              "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), '2024-04-01').key1]"
+            }
+          }
+        }
+      }
+    },
+    "aoai": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('aoai-{0}', uniqueString(resourceGroup().id, variables('baseName')))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "name": {
+            "value": "[variables('aoaiName')]"
+          },
+          "environment": {
+            "value": "[parameters('environment')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "deploymentName": {
+            "value": "[parameters('azureOpenAIDeploymentName')]"
+          },
+          "modelName": {
+            "value": "[parameters('azureOpenAIModelName')]"
+          },
+          "modelVersion": {
+            "value": "[parameters('azureOpenAIModelVersion')]"
+          },
+          "createDeployment": {
+            "value": "[parameters('createAzureOpenAIDeployment')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.41.2.15936",
+              "templateHash": "5047181891238927503"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "deploymentName": {
+              "type": "string",
+              "defaultValue": "gpt-4o"
+            },
+            "modelName": {
+              "type": "string",
+              "defaultValue": "gpt-4o"
+            },
+            "modelVersion": {
+              "type": "string",
+              "defaultValue": "2024-08-06"
+            },
+            "createDeployment": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Whether to create the model deployment in Azure OpenAI."
+              }
+            }
+          },
+          "resources": {
+            "aoai": {
+              "type": "Microsoft.CognitiveServices/accounts",
+              "apiVersion": "2024-04-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[union(parameters('tags'), createObject('env', parameters('environment'), 'app', 'project1-idp'))]",
+              "kind": "OpenAI",
+              "sku": {
+                "name": "S0"
+              },
+              "properties": {
+                "publicNetworkAccess": "Enabled"
+              }
+            },
+            "deployment": {
+              "condition": "[parameters('createDeployment')]",
+              "type": "Microsoft.CognitiveServices/accounts/deployments",
+              "apiVersion": "2024-04-01",
+              "name": "[format('{0}/{1}', parameters('name'), parameters('deploymentName'))]",
+              "properties": {
+                "model": {
+                  "format": "OpenAI",
+                  "name": "[parameters('modelName')]",
+                  "version": "[parameters('modelVersion')]"
+                },
+                "scaleSettings": {
+                  "scaleType": "Standard"
+                }
+              },
+              "dependsOn": [
+                "aoai"
+              ]
+            }
+          },
+          "outputs": {
+            "id": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('name'))]"
+            },
+            "endpoint": {
+              "type": "string",
+              "value": "[reference('aoai').endpoint]"
+            },
+            "key1": {
+              "type": "securestring",
+              "value": "[listKeys(resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), '2024-04-01').key1]"
+            },
+            "deploymentNameOut": {
+              "type": "string",
+              "value": "[parameters('deploymentName')]"
+            }
+          }
+        }
+      }
+    },
+    "api": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('api-{0}', uniqueString(resourceGroup().id, variables('baseName')))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "name": {
+            "value": "[variables('apiAppName')]"
+          },
+          "environment": {
+            "value": "[parameters('environment')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "containerAppsEnvironmentId": {
+            "value": "[reference('cae').outputs.id.value]"
+          },
+          "image": {
+            "value": "[parameters('apiImage')]"
+          },
+          "cosmosEndpoint": {
+            "value": "[reference('cosmos').outputs.endpoint.value]"
+          },
+          "cosmosKey": {
+            "value": "[listOutputsWithSecureValues('cosmos', '2025-04-01').primaryKey]"
+          },
+          "cosmosDatabase": {
+            "value": "[reference('cosmos').outputs.database.value]"
+          },
+          "cosmosContainer": {
+            "value": "[reference('cosmos').outputs.containerNameOut.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.41.2.15936",
+              "templateHash": "10117151527708243003"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "containerAppsEnvironmentId": {
+              "type": "string"
+            },
+            "image": {
+              "type": "string"
+            },
+            "targetPort": {
+              "type": "int",
+              "defaultValue": 8080
+            },
+            "cosmosEndpoint": {
+              "type": "string"
+            },
+            "cosmosKey": {
+              "type": "securestring"
+            },
+            "cosmosDatabase": {
+              "type": "string"
+            },
+            "cosmosContainer": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.App/containerApps",
+              "apiVersion": "2024-03-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[union(parameters('tags'), createObject('env', parameters('environment'), 'app', 'project1-idp', 'component', 'api'))]",
+              "properties": {
+                "managedEnvironmentId": "[parameters('containerAppsEnvironmentId')]",
+                "configuration": {
+                  "ingress": {
+                    "external": true,
+                    "targetPort": "[parameters('targetPort')]",
+                    "transport": "auto"
+                  },
+                  "registries": []
+                },
+                "template": {
+                  "containers": [
+                    {
+                      "name": "api",
+                      "image": "[parameters('image')]",
+                      "env": [
+                        {
+                          "name": "Cosmos__Endpoint",
+                          "value": "[parameters('cosmosEndpoint')]"
+                        },
+                        {
+                          "name": "Cosmos__Key",
+                          "value": "[parameters('cosmosKey')]"
+                        },
+                        {
+                          "name": "Cosmos__Database",
+                          "value": "[parameters('cosmosDatabase')]"
+                        },
+                        {
+                          "name": "Cosmos__Container",
+                          "value": "[parameters('cosmosContainer')]"
+                        }
+                      ]
+                    }
+                  ],
+                  "scale": {
+                    "minReplicas": 1,
+                    "maxReplicas": 3
+                  }
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "fqdn": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.App/containerApps', parameters('name')), '2024-03-01').configuration.ingress.fqdn]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "cae",
+        "cosmos"
+      ]
+    },
+    "pipeline": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('pipeline-{0}', uniqueString(resourceGroup().id, variables('baseName')))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "name": {
+            "value": "[variables('pipelineJobName')]"
+          },
+          "environment": {
+            "value": "[parameters('environment')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "containerAppsEnvironmentId": {
+            "value": "[reference('cae').outputs.id.value]"
+          },
+          "image": {
+            "value": "[parameters('pipelineImage')]"
+          },
+          "documentIntelligenceEndpoint": {
+            "value": "[reference('di').outputs.endpoint.value]"
+          },
+          "documentIntelligenceKey": {
+            "value": "[listOutputsWithSecureValues('di', '2025-04-01').key1]"
+          },
+          "documentIntelligenceModelId": {
+            "value": "[parameters('documentIntelligenceModelId')]"
+          },
+          "azureOpenAIEndpoint": {
+            "value": "[reference('aoai').outputs.endpoint.value]"
+          },
+          "azureOpenAIKey": {
+            "value": "[listOutputsWithSecureValues('aoai', '2025-04-01').key1]"
+          },
+          "azureOpenAIDeploymentName": {
+            "value": "[reference('aoai').outputs.deploymentNameOut.value]"
+          },
+          "azureOpenAIApiVersion": {
+            "value": "[parameters('azureOpenAIApiVersion')]"
+          },
+          "cosmosEndpoint": {
+            "value": "[reference('cosmos').outputs.endpoint.value]"
+          },
+          "cosmosKey": {
+            "value": "[listOutputsWithSecureValues('cosmos', '2025-04-01').primaryKey]"
+          },
+          "cosmosDatabase": {
+            "value": "[reference('cosmos').outputs.database.value]"
+          },
+          "cosmosContainer": {
+            "value": "[reference('cosmos').outputs.containerNameOut.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.41.2.15936",
+              "templateHash": "4572315126436146212"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "containerAppsEnvironmentId": {
+              "type": "string"
+            },
+            "image": {
+              "type": "string"
+            },
+            "documentIntelligenceEndpoint": {
+              "type": "string"
+            },
+            "documentIntelligenceKey": {
+              "type": "securestring"
+            },
+            "documentIntelligenceModelId": {
+              "type": "string",
+              "defaultValue": "prebuilt-document"
+            },
+            "azureOpenAIEndpoint": {
+              "type": "string"
+            },
+            "azureOpenAIKey": {
+              "type": "securestring"
+            },
+            "azureOpenAIDeploymentName": {
+              "type": "string",
+              "defaultValue": "gpt-4o"
+            },
+            "azureOpenAIApiVersion": {
+              "type": "string",
+              "defaultValue": "2024-06-01"
+            },
+            "cosmosEndpoint": {
+              "type": "string"
+            },
+            "cosmosKey": {
+              "type": "securestring"
+            },
+            "cosmosDatabase": {
+              "type": "string"
+            },
+            "cosmosContainer": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.App/jobs",
+              "apiVersion": "2024-03-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[union(parameters('tags'), createObject('env', parameters('environment'), 'app', 'project1-idp', 'component', 'pipeline'))]",
+              "properties": {
+                "environmentId": "[parameters('containerAppsEnvironmentId')]",
+                "configuration": {
+                  "triggerType": "Manual",
+                  "replicaTimeout": 1800,
+                  "replicaRetryLimit": 1
+                },
+                "template": {
+                  "containers": [
+                    {
+                      "name": "pipeline",
+                      "image": "[parameters('image')]",
+                      "env": [
+                        {
+                          "name": "DOCUMENT_INTELLIGENCE_ENDPOINT",
+                          "value": "[parameters('documentIntelligenceEndpoint')]"
+                        },
+                        {
+                          "name": "DOCUMENT_INTELLIGENCE_KEY",
+                          "value": "[parameters('documentIntelligenceKey')]"
+                        },
+                        {
+                          "name": "DOCUMENT_INTELLIGENCE_MODEL",
+                          "value": "[parameters('documentIntelligenceModelId')]"
+                        },
+                        {
+                          "name": "AZURE_OPENAI_ENDPOINT",
+                          "value": "[parameters('azureOpenAIEndpoint')]"
+                        },
+                        {
+                          "name": "AZURE_OPENAI_API_KEY",
+                          "value": "[parameters('azureOpenAIKey')]"
+                        },
+                        {
+                          "name": "AZURE_OPENAI_DEPLOYMENT",
+                          "value": "[parameters('azureOpenAIDeploymentName')]"
+                        },
+                        {
+                          "name": "AZURE_OPENAI_API_VERSION",
+                          "value": "[parameters('azureOpenAIApiVersion')]"
+                        },
+                        {
+                          "name": "COSMOS_ENDPOINT",
+                          "value": "[parameters('cosmosEndpoint')]"
+                        },
+                        {
+                          "name": "COSMOS_KEY",
+                          "value": "[parameters('cosmosKey')]"
+                        },
+                        {
+                          "name": "COSMOS_DATABASE",
+                          "value": "[parameters('cosmosDatabase')]"
+                        },
+                        {
+                          "name": "COSMOS_CONTAINER",
+                          "value": "[parameters('cosmosContainer')]"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.App/jobs', parameters('name'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "aoai",
+        "cae",
+        "cosmos",
+        "di"
+      ]
+    }
+  },
+  "outputs": {
+    "cosmosEndpoint": {
+      "type": "string",
+      "value": "[reference('cosmos').outputs.endpoint.value]"
+    },
+    "cosmosDatabase": {
+      "type": "string",
+      "value": "[reference('cosmos').outputs.database.value]"
+    },
+    "cosmosContainer": {
+      "type": "string",
+      "value": "[reference('cosmos').outputs.containerNameOut.value]"
+    },
+    "documentIntelligenceEndpoint": {
+      "type": "string",
+      "value": "[reference('di').outputs.endpoint.value]"
+    },
+    "azureOpenAIEndpoint": {
+      "type": "string",
+      "value": "[reference('aoai').outputs.endpoint.value]"
+    },
+    "apiFqdn": {
+      "type": "string",
+      "value": "[reference('api').outputs.fqdn.value]"
+    }
+  }
+}

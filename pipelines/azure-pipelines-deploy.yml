@@ -1,0 +1,70 @@
+trigger: none
+pr: none
+
+parameters:
+  - name: environmentName
+    type: string
+    default: dev
+    values:
+      - dev
+      - test
+      - prod
+
+variables:
+  - name: azureServiceConnection
+    value: 'AZURE-SC-NAME'
+  - name: location
+    value: 'eastus'
+
+  # Resource groups per environment
+  - name: rg_dev
+    value: 'rg-project1-idp-dev'
+  - name: rg_test
+    value: 'rg-project1-idp-test'
+  - name: rg_prod
+    value: 'rg-project1-idp-prod'
+
+  # Bicep param files per environment
+  - name: bicepParam_dev
+    value: 'infra/params/dev.bicepparam'
+  - name: bicepParam_test
+    value: 'infra/params/test.bicepparam'
+  - name: bicepParam_prod
+    value: 'infra/params/prod.bicepparam'
+
+  # Images (override at queue time or set via variable group)
+  - name: apiImage
+    value: 'myacr.azurecr.io/project1-api:latest'
+  - name: pipelineImage
+    value: 'myacr.azurecr.io/project1-idp-pipeline:latest'
+
+stages:
+  - stage: Deploy
+    displayName: Deploy to ${{ parameters.environmentName }}
+    variables:
+      - ${{ if eq(parameters.environmentName, 'dev') }}:
+          - name: resourceGroupName
+            value: $(rg_dev)
+          - name: bicepParamFile
+            value: $(bicepParam_dev)
+      - ${{ if eq(parameters.environmentName, 'test') }}:
+          - name: resourceGroupName
+            value: $(rg_test)
+          - name: bicepParamFile
+            value: $(bicepParam_test)
+      - ${{ if eq(parameters.environmentName, 'prod') }}:
+          - name: resourceGroupName
+            value: $(rg_prod)
+          - name: bicepParamFile
+            value: $(bicepParam_prod)
+    jobs:
+      - template: templates/deploy-infra.yml
+        parameters:
+          azureServiceConnection: $(azureServiceConnection)
+          environmentName: ${{ parameters.environmentName }}
+          location: $(location)
+          resourceGroupName: $(resourceGroupName)
+          bicepParamFile: $(bicepParamFile)
+          apiImage: $(apiImage)
+          pipelineImage: $(pipelineImage)
+

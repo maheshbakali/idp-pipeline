@@ -1,0 +1,68 @@
+parameters:
+  - name: azureServiceConnection
+    type: string
+  - name: acrName
+    type: string
+  - name: apiRepository
+    type: string
+    default: project1-api
+  - name: pipelineRepository
+    type: string
+    default: project1-idp-pipeline
+  - name: imageTag
+    type: string
+  - name: vmImage
+    type: string
+    default: ubuntu-latest
+
+jobs:
+  - job: BuildAndPush
+    displayName: Build and push images
+    pool:
+      vmImage: ${{ parameters.vmImage }}
+    steps:
+      - checkout: self
+
+      - task: AzureCLI@2
+        displayName: ACR login
+        inputs:
+          azureSubscription: ${{ parameters.azureServiceConnection }}
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            az acr login --name "${{ parameters.acrName }}"
+            loginServer="$(az acr show -n "${{ parameters.acrName }}" --query loginServer -o tsv)"
+            echo "##vso[task.setvariable variable=ACR_LOGIN_SERVER]$loginServer"
+            echo "##vso[task.setvariable variable=acrLoginServer;isOutput=true]$loginServer"
+
+      - task: Docker@2
+        displayName: Build & push .NET API image
+        inputs:
+          command: buildAndPush
+          repository: $(ACR_LOGIN_SERVER)/${{ parameters.apiRepository }}
+          dockerfile: dotnet-api/Dockerfile
+          buildContext: .
+          tags: |
+            ${{ parameters.imageTag }}
+
+      - task: Docker@2
+        displayName: Build & push Python pipeline image
+        inputs:
+          command: buildAndPush
+          repository: $(ACR_LOGIN_SERVER)/${{ parameters.pipelineRepository }}
+          dockerfile: src/python_pipeline/Dockerfile
+          buildContext: .
+          tags: |
+            ${{ parameters.imageTag }}
+
+      - bash: |
+          set -euo pipefail
+          echo "API_IMAGE=$(ACR_LOGIN_SERVER)/${{ parameters.apiRepository }}:${{ parameters.imageTag }}" >> $(Build.ArtifactStagingDirectory)/images.env
+          echo "PIPELINE_IMAGE=$(ACR_LOGIN_SERVER)/${{ parameters.pipelineRepository }}:${{ parameters.imageTag }}" >> $(Build.ArtifactStagingDirectory)/images.env
+        displayName: Write images env file
+
+      - publish: $(Build.ArtifactStagingDirectory)/images.env
+        artifact: images
+        displayName: Publish image references
+

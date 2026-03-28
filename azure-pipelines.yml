@@ -1,0 +1,135 @@
+trigger:
+  branches:
+    include:
+      - main
+      - master
+
+pr:
+  branches:
+    include:
+      - main
+      - master
+
+variables:
+  - name: azureServiceConnection
+    value: 'AZURE-SC-NAME'
+  - name: acrName
+    value: 'myacr'
+  - name: apiRepository
+    value: 'project1-api'
+  - name: pipelineRepository
+    value: 'project1-idp-pipeline'
+  - name: imageTag
+    value: '$(Build.BuildId)'
+
+  - name: location
+    value: 'eastus'
+
+  - name: rg_dev
+    value: 'rg-project1-idp-dev'
+  - name: rg_test
+    value: 'rg-project1-idp-test'
+  - name: rg_prod
+    value: 'rg-project1-idp-prod'
+
+stages:
+  - stage: Build
+    displayName: Build & push images
+    jobs:
+      - template: pipelines/templates/build-images.yml
+        parameters:
+          azureServiceConnection: $(azureServiceConnection)
+          acrName: $(acrName)
+          apiRepository: $(apiRepository)
+          pipelineRepository: $(pipelineRepository)
+          imageTag: $(imageTag)
+
+  - stage: Dev
+    displayName: Deploy to Dev
+    dependsOn: Build
+    variables:
+      - name: acrLoginServer
+        value: $[ stageDependencies.Build.BuildAndPush.outputs['BuildAndPush.acrLoginServer'] ]
+      - name: apiImage
+        value: '$(acrLoginServer)/$(apiRepository):$(imageTag)'
+      - name: pipelineImage
+        value: '$(acrLoginServer)/$(pipelineRepository):$(imageTag)'
+    jobs:
+      - template: pipelines/templates/deploy-infra.yml
+        parameters:
+          azureServiceConnection: $(azureServiceConnection)
+          environmentName: dev
+          resourceGroupName: $(rg_dev)
+          location: $(location)
+          bicepParamFile: infra/params/dev.bicepparam
+          apiImage: $(apiImage)
+          pipelineImage: $(pipelineImage)
+
+  - stage: Test
+    displayName: Deploy to Test
+    dependsOn: Dev
+    variables:
+      - name: acrLoginServer
+        value: $[ stageDependencies.Build.BuildAndPush.outputs['BuildAndPush.acrLoginServer'] ]
+      - name: apiImage
+        value: '$(acrLoginServer)/$(apiRepository):$(imageTag)'
+      - name: pipelineImage
+        value: '$(acrLoginServer)/$(pipelineRepository):$(imageTag)'
+    jobs:
+      - job: ApproveTest
+        displayName: Approve deployment to Test
+        pool: server
+        steps:
+          - task: ManualValidation@0
+            displayName: Manual approval - Test
+            timeoutInMinutes: 1440
+            inputs:
+              notifyUsers: ''
+              instructions: 'Please review the Dev deployment and approve to proceed with Test.'
+              onTimeout: reject
+
+      - template: pipelines/templates/deploy-infra.yml
+        parameters:
+          azureServiceConnection: $(azureServiceConnection)
+          environmentName: test
+          resourceGroupName: $(rg_test)
+          location: $(location)
+          bicepParamFile: infra/params/test.bicepparam
+          apiImage: $(apiImage)
+          pipelineImage: $(pipelineImage)
+        dependsOn: ApproveTest
+
+  - stage: Prod
+    displayName: Deploy to Prod
+    dependsOn: Test
+    variables:
+      - name: acrLoginServer
+        value: $[ stageDependencies.Build.BuildAndPush.outputs['BuildAndPush.acrLoginServer'] ]
+      - name: apiImage
+        value: '$(acrLoginServer)/$(apiRepository):$(imageTag)'
+      - name: pipelineImage
+        value: '$(acrLoginServer)/$(pipelineRepository):$(imageTag)'
+    jobs:
+      - job: ApproveProd
+        displayName: Approve deployment to Prod
+        pool: server
+        steps:
+          - task: ManualValidation@0
+            displayName: Manual approval - Prod
+            timeoutInMinutes: 1440
+            inputs:
+              notifyUsers: ''
+              instructions: 'Please review the Test deployment and approve to proceed with Prod.'
+              onTimeout: reject
+
+      - template: pipelines/templates/deploy-infra.yml
+        parameters:
+          azureServiceConnection: $(azureServiceConnection)
+          environmentName: prod
+          resourceGroupName: $(rg_prod)
+          location: $(location)
+          bicepParamFile: infra/params/prod.bicepparam
+          apiImage: $(apiImage)
+          pipelineImage: $(pipelineImage)
+        dependsOn: ApproveProd
+

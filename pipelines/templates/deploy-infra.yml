@@ -1,0 +1,63 @@
+parameters:
+  - name: azureServiceConnection
+    type: string
+  - name: environmentName
+    type: string
+  - name: resourceGroupName
+    type: string
+  - name: location
+    type: string
+  - name: bicepFile
+    type: string
+    default: infra/main.bicep
+  - name: bicepParamFile
+    type: string
+  - name: apiImage
+    type: string
+  - name: pipelineImage
+    type: string
+  - name: deploymentName
+    type: string
+    default: idp-$(Build.BuildId)
+  - name: vmImage
+    type: string
+    default: ubuntu-latest
+
+jobs:
+  - deployment: Deploy_${{ parameters.environmentName }}
+    displayName: Deploy infra (${{ parameters.environmentName }})
+    environment: ${{ parameters.environmentName }}
+    pool:
+      vmImage: ${{ parameters.vmImage }}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - checkout: self
+
+            - task: AzureCLI@2
+              displayName: Create resource group
+              inputs:
+                azureSubscription: ${{ parameters.azureServiceConnection }}
+                scriptType: bash
+                scriptLocation: inlineScript
+                inlineScript: |
+                  set -euo pipefail
+                  az group create -n "${{ parameters.resourceGroupName }}" -l "${{ parameters.location }}"
+
+            - task: AzureCLI@2
+              displayName: Deploy Bicep
+              inputs:
+                azureSubscription: ${{ parameters.azureServiceConnection }}
+                scriptType: bash
+                scriptLocation: inlineScript
+                inlineScript: |
+                  set -euo pipefail
+                  az deployment group create \
+                    -g "${{ parameters.resourceGroupName }}" \
+                    -n "${{ parameters.deploymentName }}" \
+                    -f "${{ parameters.bicepFile }}" \
+                    -p "${{ parameters.bicepParamFile }}" \
+                    -p apiImage="${{ parameters.apiImage }}" \
+                    -p pipelineImage="${{ parameters.pipelineImage }}"
+

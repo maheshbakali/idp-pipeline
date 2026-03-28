@@ -1,0 +1,17 @@
+Given the document type "{doc_type}" and extracted payload below, create a strict JSON object.
+
+Requirements:
+1) Normalize key fields into a flat object called "normalizedFields"
+2) Add "summary" as concise business summary
+3) Add "entities" array with notable parties/organizations
+4) Add "riskSignals" array with potential anomalies or compliance concerns
+5) Add "tags" array with searchable tags
+6) Add "confidenceAssessment" object with:
+   - extractionCoverage (0-1)
+   - enrichmentConfidence (0-1)
+   - notes
+
+Return only JSON.
+
+Extracted payload:
+{extracted_json}

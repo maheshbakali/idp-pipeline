@@ -1,0 +1,5 @@
+azure-ai-documentintelligence
+azure-cosmos
+openai
+python-dotenv
+pydantic
