@@ -201,4 +201,3 @@ Reusable templates live in `pipelines/templates/`.
 - Create / use an **Azure Container Registry** and set `acrName` (ACR resource name).
 - Create Azure DevOps **Environments** named `dev`, `test`, `prod` (you can add approvals/checks for Test/Prod).
 
-
