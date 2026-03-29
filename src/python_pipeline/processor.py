@@ -10,7 +10,8 @@ from config import Settings
 from models import ProcessedDocument, ProcessingMetadata, utc_now_iso
 from storage.cosmos_repository import CosmosRepository
 
-
+# DocumentProcessor orchestrates the processing of documents: it extracts content using Azure Document Intelligence, 
+# enriches it with Azure OpenAI, and stores the results in Cosmos DB.
 class DocumentProcessor:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings

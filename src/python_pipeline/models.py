@@ -4,14 +4,14 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-
+# Models for the processed document and metadata to be stored in Cosmos DB.
 class ProcessingMetadata(BaseModel):
     extracted_at_utc: str
     enriched_at_utc: str
     document_intelligence_model: str
     openai_deployment: str
 
-
+# The main document model that will be stored in Cosmos DB.
 class ProcessedDocument(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     partitionKey: str

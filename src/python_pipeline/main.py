@@ -5,7 +5,9 @@ import json
 from config import get_settings
 from processor import DocumentProcessor
 
-
+# This is the main entry point for the document processing pipeline. 
+# It parses command-line arguments, initializes the document processor with Azure clients, and processes the input file. 
+# The final enriched document is printed as JSON, which can be redirected to a file or another system as needed.
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Process a document with Azure Document Intelligence + GPT enrichment."

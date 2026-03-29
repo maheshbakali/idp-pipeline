@@ -29,7 +29,7 @@ def create_azure_openai_client(settings: Settings) -> AzureOpenAI:
         azure_endpoint=endpoint,
     )
 
-
+# Functions to interact with Azure Document Intelligence and Azure OpenAI for document processing and enrichment.
 def extract_with_document_intelligence(
     client: DocumentIntelligenceClient,
     model_id: str,
@@ -64,7 +64,7 @@ def extract_with_document_intelligence(
 
     return {"documents": documents, "pages": pages, "content": result.content}
 
-
+# The enrichment function that sends the extracted data to Azure OpenAI for further processing based on a provided prompt template.
 def enrich_with_gpt(
     client: AzureOpenAI,
     deployment: str,
@@ -79,7 +79,7 @@ def enrich_with_gpt(
 
     response = client.chat.completions.create(
         model=deployment,
-        temperature=0.1,
+        temperature=0.1, # low temperature for more precise and deterministic output
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": "You are a precise document enrichment assistant."},
