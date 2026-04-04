@@ -5,6 +5,13 @@
     "Database": "IdpDatabase",
     "Container": "DocumentContainer"
   },
+  "Blob": {
+    "ConnectionString": "<storage-connection-string-or-UseDevelopmentStorage=true>",
+    "ContainerName": "uploads"
+  },
+  "Cors": {
+    "AllowedOrigins": []
+  },
   "Logging": {
     "LogLevel": {
       "Default": "Information",

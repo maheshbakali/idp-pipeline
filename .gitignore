@@ -17,6 +17,7 @@ venv/
 .env
 .env.*
 !.env.example
+src/azure_function/local.settings.json
 
 # IDE / editor
 .vscode/*

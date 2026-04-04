@@ -3,10 +3,16 @@ Given the document type "{doc_type}" and extracted payload below, create a stric
 Requirements:
 1) Normalize key fields into a flat object called "normalizedFields"
 2) Add "summary" as concise business summary
-3) Add "entities" array with notable parties/organizations
-4) Add "riskSignals" array with potential anomalies or compliance concerns
-5) Add "tags" array with searchable tags
-6) Add "confidenceAssessment" object with:
+3) Add "documentPurpose" as a one-line statement of what the document is for
+4) Add "entities" array with notable parties/organizations (each item: name, role or type if inferable)
+5) Add "keyDates" array: objects with "label", "value" (ISO-8601 date when clear, else verbatim text), optional "context"
+6) Add "actionItems" array of concrete follow-ups or obligations implied by the document
+7) Add "financialHighlights" array: objects with "description", "amount" (string or number), "currency" (ISO code or "unknown"); use [] if none
+8) Add "referencedIdentifiers" array: objects with "kind" (e.g. invoice_number, policy_id) and "value"
+9) Add "riskSignals" array with potential anomalies or compliance concerns
+10) Add "tags" array with searchable tags
+11) Add "suggestedNextSteps" array of short operational next steps for a human reviewer or workflow
+12) Add "confidenceAssessment" object with:
    - extractionCoverage (0-1)
    - enrichmentConfidence (0-1)
    - notes

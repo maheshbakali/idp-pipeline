@@ -21,6 +21,8 @@ class ProcessedDocument(BaseModel):
     documentIntelligence: dict[str, Any]
     gptEnrichment: dict[str, Any]
     processingMetadata: ProcessingMetadata
+    uploadId: str | None = None
+    blobPath: str | None = None
 
 
 def utc_now_iso() -> str:

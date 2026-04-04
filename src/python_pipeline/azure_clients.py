@@ -1,3 +1,4 @@
+import io
 import json
 from typing import Any
 
@@ -35,7 +36,7 @@ def extract_with_document_intelligence(
     model_id: str,
     file_bytes: bytes,
 ) -> dict[str, Any]:
-    poller = client.begin_analyze_document(model_id=model_id, body=file_bytes)
+    poller = client.begin_analyze_document(model_id=model_id, body=io.BytesIO(file_bytes))
     result = poller.result()
 
     documents = []
@@ -88,4 +89,6 @@ def enrich_with_gpt(
     )
 
     message_content = response.choices[0].message.content
+    if not message_content:
+        raise ValueError("OpenAI returned empty message content")
     return json.loads(message_content)

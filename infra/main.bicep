@@ -79,6 +79,13 @@ var aoaiName = '${baseName}-aoai'
 var apiAppName = '${baseName}-api'
 var pipelineJobName = '${baseName}-pipeline'
 
+// Storage for uploads + Functions host (same account as AzureWebJobsStorage on the function app).
+var uploadStorageAccountName = take(
+  replace(toLower('blob${baseName}${uniqueString(resourceGroup().id, baseName)}'), '-', ''),
+  24
+)
+var functionAppName = take(replace('${baseName}-fn-${take(uniqueString(resourceGroup().id, 'func'), 8)}', '_', '-'), 60)
+
 module law './modules/logAnalytics.bicep' = {
   name: 'law-${uniqueString(resourceGroup().id, baseName)}'
   params: {
@@ -141,6 +148,40 @@ module aoai './modules/openai.bicep' = {
   }
 }
 
+module uploadStorage './modules/documentsStorage.bicep' = {
+  name: 'upload-stg-${uniqueString(resourceGroup().id, baseName)}'
+  params: {
+    location: location
+    accountName: uploadStorageAccountName
+    envName: environment
+    tags: tags
+    uploadContainerName: 'uploads'
+  }
+}
+
+module idpFunction './modules/functionApp.bicep' = {
+  name: 'func-${uniqueString(resourceGroup().id, baseName)}'
+  params: {
+    location: location
+    name: functionAppName
+    environment: environment
+    tags: tags
+    storageConnectionString: uploadStorage.outputs.connectionString
+    documentIntelligenceEndpoint: di.outputs.endpoint
+    documentIntelligenceKey: di.outputs.key1
+    documentIntelligenceModelId: documentIntelligenceModelId
+    azureOpenAIEndpoint: aoai.outputs.endpoint
+    azureOpenAIKey: aoai.outputs.key1
+    azureOpenAIDeploymentName: aoai.outputs.deploymentNameOut
+    azureOpenAIApiVersion: azureOpenAIApiVersion
+    cosmosEndpoint: cosmos.outputs.endpoint
+    cosmosKey: cosmos.outputs.primaryKey
+    cosmosDatabase: cosmos.outputs.database
+    cosmosContainer: cosmos.outputs.containerNameOut
+    applicationInsightsConnectionString: ''
+  }
+}
+
 module api './modules/apiContainerApp.bicep' = {
   name: 'api-${uniqueString(resourceGroup().id, baseName)}'
   params: {
@@ -154,6 +195,8 @@ module api './modules/apiContainerApp.bicep' = {
     cosmosKey: cosmos.outputs.primaryKey
     cosmosDatabase: cosmos.outputs.database
     cosmosContainer: cosmos.outputs.containerNameOut
+    blobConnectionString: uploadStorage.outputs.connectionString
+    blobContainerName: uploadStorage.outputs.uploadContainerNameOut
   }
 }
 
@@ -186,4 +229,7 @@ output cosmosContainer string = cosmos.outputs.containerNameOut
 output documentIntelligenceEndpoint string = di.outputs.endpoint
 output azureOpenAIEndpoint string = aoai.outputs.endpoint
 output apiFqdn string = api.outputs.fqdn
+output uploadStorageAccountName string = uploadStorage.outputs.accountNameOut
+output functionAppNameOut string = idpFunction.outputs.functionAppName
+output functionAppDefaultHostName string = idpFunction.outputs.defaultHostName
 

@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.41.2.15936",
-      "templateHash": "6886631384105371214"
+      "templateHash": "14820545861974428917"
     }
   },
   "parameters": {
@@ -157,7 +157,9 @@
     "diName": "[format('{0}-di', variables('baseName'))]",
     "aoaiName": "[format('{0}-aoai', variables('baseName'))]",
     "apiAppName": "[format('{0}-api', variables('baseName'))]",
-    "pipelineJobName": "[format('{0}-pipeline', variables('baseName'))]"
+    "pipelineJobName": "[format('{0}-pipeline', variables('baseName'))]",
+    "uploadStorageAccountName": "[take(replace(toLower(format('blob{0}{1}', variables('baseName'), uniqueString(resourceGroup().id, variables('baseName')))), '-', ''), 24)]",
+    "functionAppName": "[take(replace(format('{0}-fn-{1}', variables('baseName'), take(uniqueString(resourceGroup().id, 'func'), 8)), '_', '-'), 60)]"
   },
   "resources": {
     "law": {
@@ -740,6 +742,332 @@
         }
       }
     },
+    "uploadStorage": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('upload-stg-{0}', uniqueString(resourceGroup().id, variables('baseName')))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "accountName": {
+            "value": "[variables('uploadStorageAccountName')]"
+          },
+          "envName": {
+            "value": "[parameters('environment')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "uploadContainerName": {
+            "value": "uploads"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.41.2.15936",
+              "templateHash": "10195838654127258101"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "accountName": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 24
+            },
+            "envName": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "uploadContainerName": {
+              "type": "string",
+              "defaultValue": "uploads"
+            }
+          },
+          "resources": {
+            "storage": {
+              "type": "Microsoft.Storage/storageAccounts",
+              "apiVersion": "2023-01-01",
+              "name": "[parameters('accountName')]",
+              "location": "[parameters('location')]",
+              "tags": "[union(parameters('tags'), createObject('env', parameters('envName'), 'app', 'project1-idp', 'component', 'uploads-functions'))]",
+              "sku": {
+                "name": "Standard_LRS"
+              },
+              "kind": "StorageV2",
+              "properties": {
+                "minimumTlsVersion": "TLS1_2",
+                "supportsHttpsTrafficOnly": true,
+                "allowBlobPublicAccess": false,
+                "encryption": {
+                  "services": {
+                    "blob": {
+                      "enabled": true
+                    },
+                    "file": {
+                      "enabled": true
+                    }
+                  },
+                  "keySource": "Microsoft.Storage"
+                }
+              }
+            },
+            "blobService": {
+              "type": "Microsoft.Storage/storageAccounts/blobServices",
+              "apiVersion": "2023-01-01",
+              "name": "[format('{0}/{1}', parameters('accountName'), 'default')]",
+              "properties": {
+                "deleteRetentionPolicy": {
+                  "enabled": true,
+                  "days": 7
+                }
+              },
+              "dependsOn": [
+                "storage"
+              ]
+            },
+            "uploadsContainer": {
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+              "apiVersion": "2023-01-01",
+              "name": "[format('{0}/{1}/{2}', parameters('accountName'), 'default', parameters('uploadContainerName'))]",
+              "properties": {
+                "publicAccess": "None"
+              },
+              "dependsOn": [
+                "blobService"
+              ]
+            }
+          },
+          "outputs": {
+            "accountNameOut": {
+              "type": "string",
+              "value": "[parameters('accountName')]"
+            },
+            "connectionString": {
+              "type": "securestring",
+              "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};EndpointSuffix={1};AccountKey={2}', parameters('accountName'), environment().suffixes.storage, listKeys('storage', '2023-01-01').keys[0].value)]"
+            },
+            "uploadContainerNameOut": {
+              "type": "string",
+              "value": "[parameters('uploadContainerName')]"
+            }
+          }
+        }
+      }
+    },
+    "idpFunction": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('func-{0}', uniqueString(resourceGroup().id, variables('baseName')))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "name": {
+            "value": "[variables('functionAppName')]"
+          },
+          "environment": {
+            "value": "[parameters('environment')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "storageConnectionString": {
+            "value": "[listOutputsWithSecureValues('uploadStorage', '2025-04-01').connectionString]"
+          },
+          "documentIntelligenceEndpoint": {
+            "value": "[reference('di').outputs.endpoint.value]"
+          },
+          "documentIntelligenceKey": {
+            "value": "[listOutputsWithSecureValues('di', '2025-04-01').key1]"
+          },
+          "documentIntelligenceModelId": {
+            "value": "[parameters('documentIntelligenceModelId')]"
+          },
+          "azureOpenAIEndpoint": {
+            "value": "[reference('aoai').outputs.endpoint.value]"
+          },
+          "azureOpenAIKey": {
+            "value": "[listOutputsWithSecureValues('aoai', '2025-04-01').key1]"
+          },
+          "azureOpenAIDeploymentName": {
+            "value": "[reference('aoai').outputs.deploymentNameOut.value]"
+          },
+          "azureOpenAIApiVersion": {
+            "value": "[parameters('azureOpenAIApiVersion')]"
+          },
+          "cosmosEndpoint": {
+            "value": "[reference('cosmos').outputs.endpoint.value]"
+          },
+          "cosmosKey": {
+            "value": "[listOutputsWithSecureValues('cosmos', '2025-04-01').primaryKey]"
+          },
+          "cosmosDatabase": {
+            "value": "[reference('cosmos').outputs.database.value]"
+          },
+          "cosmosContainer": {
+            "value": "[reference('cosmos').outputs.containerNameOut.value]"
+          },
+          "applicationInsightsConnectionString": {
+            "value": ""
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.41.2.15936",
+              "templateHash": "17281306850461847156"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {}
+            },
+            "storageConnectionString": {
+              "type": "securestring"
+            },
+            "documentIntelligenceEndpoint": {
+              "type": "string"
+            },
+            "documentIntelligenceKey": {
+              "type": "securestring"
+            },
+            "documentIntelligenceModelId": {
+              "type": "string",
+              "defaultValue": "prebuilt-document"
+            },
+            "azureOpenAIEndpoint": {
+              "type": "string"
+            },
+            "azureOpenAIKey": {
+              "type": "securestring"
+            },
+            "azureOpenAIDeploymentName": {
+              "type": "string",
+              "defaultValue": "gpt-4o"
+            },
+            "azureOpenAIApiVersion": {
+              "type": "string",
+              "defaultValue": "2024-06-01"
+            },
+            "cosmosEndpoint": {
+              "type": "string"
+            },
+            "cosmosKey": {
+              "type": "securestring"
+            },
+            "cosmosDatabase": {
+              "type": "string"
+            },
+            "cosmosContainer": {
+              "type": "string"
+            },
+            "applicationInsightsConnectionString": {
+              "type": "securestring",
+              "defaultValue": ""
+            }
+          },
+          "variables": {
+            "appSettings": "[concat(createArray(createObject('name', 'AzureWebJobsStorage', 'value', parameters('storageConnectionString')), createObject('name', 'FUNCTIONS_EXTENSION_VERSION', 'value', '~4'), createObject('name', 'FUNCTIONS_WORKER_RUNTIME', 'value', 'python'), createObject('name', 'PYTHON_ENABLE_WORKER_EXTENSIONS', 'value', '1'), createObject('name', 'DOCUMENT_INTELLIGENCE_ENDPOINT', 'value', parameters('documentIntelligenceEndpoint')), createObject('name', 'DOCUMENT_INTELLIGENCE_KEY', 'value', parameters('documentIntelligenceKey')), createObject('name', 'DOCUMENT_INTELLIGENCE_MODEL', 'value', parameters('documentIntelligenceModelId')), createObject('name', 'AZURE_OPENAI_ENDPOINT', 'value', parameters('azureOpenAIEndpoint')), createObject('name', 'AZURE_OPENAI_API_KEY', 'value', parameters('azureOpenAIKey')), createObject('name', 'AZURE_OPENAI_DEPLOYMENT', 'value', parameters('azureOpenAIDeploymentName')), createObject('name', 'AZURE_OPENAI_API_VERSION', 'value', parameters('azureOpenAIApiVersion')), createObject('name', 'COSMOS_ENDPOINT', 'value', parameters('cosmosEndpoint')), createObject('name', 'COSMOS_KEY', 'value', parameters('cosmosKey')), createObject('name', 'COSMOS_DATABASE', 'value', parameters('cosmosDatabase')), createObject('name', 'COSMOS_CONTAINER', 'value', parameters('cosmosContainer'))), if(empty(parameters('applicationInsightsConnectionString')), createArray(), createArray(createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'value', parameters('applicationInsightsConnectionString')))))]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Web/serverfarms",
+              "apiVersion": "2023-12-01",
+              "name": "[format('{0}-plan', parameters('name'))]",
+              "location": "[parameters('location')]",
+              "tags": "[union(parameters('tags'), createObject('env', parameters('environment'), 'app', 'project1-idp', 'component', 'function-host'))]",
+              "sku": {
+                "name": "Y1",
+                "tier": "Dynamic"
+              },
+              "properties": {
+                "reserved": true
+              }
+            },
+            {
+              "type": "Microsoft.Web/sites",
+              "apiVersion": "2023-12-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[union(parameters('tags'), createObject('env', parameters('environment'), 'app', 'project1-idp', 'component', 'blob-processor'))]",
+              "kind": "functionapp,linux",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('{0}-plan', parameters('name')))]",
+                "httpsOnly": true,
+                "siteConfig": {
+                  "linuxFxVersion": "PYTHON|3.11",
+                  "ftpsState": "Disabled",
+                  "minTlsVersion": "1.2",
+                  "appSettings": "[variables('appSettings')]"
+                },
+                "clientAffinityEnabled": false
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', format('{0}-plan', parameters('name')))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "functionAppName": {
+              "type": "string",
+              "value": "[parameters('name')]"
+            },
+            "principalId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Web/sites', parameters('name')), '2023-12-01', 'full').identity.principalId]"
+            },
+            "defaultHostName": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Web/sites', parameters('name')), '2023-12-01').defaultHostName]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "aoai",
+        "cosmos",
+        "di",
+        "uploadStorage"
+      ]
+    },
     "api": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
@@ -779,6 +1107,12 @@
           },
           "cosmosContainer": {
             "value": "[reference('cosmos').outputs.containerNameOut.value]"
+          },
+          "blobConnectionString": {
+            "value": "[listOutputsWithSecureValues('uploadStorage', '2025-04-01').connectionString]"
+          },
+          "blobContainerName": {
+            "value": "[reference('uploadStorage').outputs.uploadContainerNameOut.value]"
           }
         },
         "template": {
@@ -788,7 +1122,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.41.2.15936",
-              "templateHash": "10117151527708243003"
+              "templateHash": "956649720545908583"
             }
           },
           "parameters": {
@@ -826,6 +1160,14 @@
             },
             "cosmosContainer": {
               "type": "string"
+            },
+            "blobConnectionString": {
+              "type": "securestring",
+              "defaultValue": ""
+            },
+            "blobContainerName": {
+              "type": "string",
+              "defaultValue": "uploads"
             }
           },
           "resources": [
@@ -866,6 +1208,14 @@
                         {
                           "name": "Cosmos__Container",
                           "value": "[parameters('cosmosContainer')]"
+                        },
+                        {
+                          "name": "Blob__ConnectionString",
+                          "value": "[parameters('blobConnectionString')]"
+                        },
+                        {
+                          "name": "Blob__ContainerName",
+                          "value": "[parameters('blobContainerName')]"
                         }
                       ]
                     }
@@ -888,7 +1238,8 @@
       },
       "dependsOn": [
         "cae",
-        "cosmos"
+        "cosmos",
+        "uploadStorage"
       ]
     },
     "pipeline": {
@@ -1131,6 +1482,18 @@
     "apiFqdn": {
       "type": "string",
       "value": "[reference('api').outputs.fqdn.value]"
+    },
+    "uploadStorageAccountName": {
+      "type": "string",
+      "value": "[reference('uploadStorage').outputs.accountNameOut.value]"
+    },
+    "functionAppNameOut": {
+      "type": "string",
+      "value": "[reference('idpFunction').outputs.functionAppName.value]"
+    },
+    "functionAppDefaultHostName": {
+      "type": "string",
+      "value": "[reference('idpFunction').outputs.defaultHostName.value]"
     }
   }
 }

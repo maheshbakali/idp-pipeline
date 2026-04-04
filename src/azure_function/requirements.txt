@@ -1,0 +1,9 @@
+# Azure Functions Python v2 model
+azure-functions>=1.20.0
+
+# Pipeline (keep in sync with repo root requirements.txt)
+azure-ai-documentintelligence
+azure-cosmos
+openai
+python-dotenv
+pydantic

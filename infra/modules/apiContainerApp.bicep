@@ -14,6 +14,10 @@ param cosmosKey string
 param cosmosDatabase string
 param cosmosContainer string
 
+@secure()
+param blobConnectionString string = ''
+param blobContainerName string = 'uploads'
+
 resource app 'Microsoft.App/containerApps@2024-03-01' = {
   name: name
   location: location
@@ -53,6 +57,14 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'Cosmos__Container'
               value: cosmosContainer
+            }
+            {
+              name: 'Blob__ConnectionString'
+              value: blobConnectionString
+            }
+            {
+              name: 'Blob__ContainerName'
+              value: blobContainerName
             }
           ]
         }

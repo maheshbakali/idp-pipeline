@@ -1,5 +1,6 @@
 azure-ai-documentintelligence
 azure-cosmos
+azure-functions>=1.20.0
 openai
 python-dotenv
 pydantic

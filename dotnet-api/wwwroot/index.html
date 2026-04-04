@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IDP — Upload invoice or receipt</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #1a1a1a; background: #f4f6f9; }
+    body { max-width: 52rem; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.35rem; font-weight: 600; }
+    .card { background: #fff; border-radius: 8px; padding: 1.25rem 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 1rem; }
+    label { display: block; font-size: .875rem; font-weight: 500; margin-bottom: .35rem; }
+    input[type="file"], select { width: 100%; margin-bottom: 1rem; }
+    button { background: #0067b8; color: #fff; border: 0; padding: .55rem 1.1rem; border-radius: 6px; font-weight: 500; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .status { font-size: .875rem; margin-top: .75rem; color: #444; }
+    pre { background: #0d1117; color: #e6edf3; padding: 1rem; border-radius: 6px; overflow: auto; font-size: .8rem; max-height: 28rem; }
+    .err { color: #b00020; }
+  </style>
+</head>
+<body>
+  <h1>Upload document</h1>
+  <p class="status">PDF, PNG, or JPEG — max 5&nbsp;MB. After upload, processing runs in Azure; results appear below when ready.</p>
+
+  <div class="card">
+    <form id="form">
+      <label for="docType">Document type</label>
+      <select id="docType" name="docType" required>
+        <option value="invoice">Invoice</option>
+        <option value="receipt">Receipt</option>
+        <option value="contract">Contract</option>
+        <option value="other">Other</option>
+      </select>
+      <label for="file">File</label>
+      <input id="file" name="file" type="file" accept=".pdf,.png,.jpg,.jpeg,image/png,image/jpeg,application/pdf" required />
+      <button type="submit" id="submit">Upload</button>
+    </form>
+    <div id="msg" class="status"></div>
+  </div>
+
+  <div class="card" id="resultCard" hidden>
+    <h2 style="font-size:1rem;margin-top:0;">Processed document</h2>
+    <pre id="out"></pre>
+  </div>
+
+  <script>
+    const form = document.getElementById('form');
+    const msg = document.getElementById('msg');
+    const out = document.getElementById('out');
+    const resultCard = document.getElementById('resultCard');
+    const submit = document.getElementById('submit');
+
+    async function poll(uploadId) {
+      const maxAttempts = 90;
+      const delayMs = 2000;
+      for (let i = 0; i < maxAttempts; i++) {
+        const r = await fetch('/documents/by-upload/' + encodeURIComponent(uploadId));
+        if (r.ok) {
+          const data = await r.json();
+          out.textContent = JSON.stringify(data, null, 2);
+          resultCard.hidden = false;
+          msg.textContent = 'Processing complete.';
+          submit.disabled = false;
+          return;
+        }
+        if (r.status !== 404) {
+          const t = await r.text();
+          throw new Error(t || r.statusText);
+        }
+        msg.textContent = 'Waiting for processing… (' + (i + 1) + '/' + maxAttempts + ')';
+        await new Promise(function (res) { setTimeout(res, delayMs); });
+      }
+      msg.innerHTML = '<span class="err">Timed out waiting for processing. Check Azure Function logs and Cosmos DB.</span>';
+      submit.disabled = false;
+    }
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      msg.textContent = '';
+      resultCard.hidden = true;
+      submit.disabled = true;
+      const fd = new FormData();
+      fd.append('docType', document.getElementById('docType').value);
+      fd.append('file', document.getElementById('file').files[0]);
+
+      try {
+        const res = await fetch('/documents/upload', { method: 'POST', body: fd });
+        const body = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+          throw new Error(body.message || res.statusText || String(res.status));
+        }
+        msg.textContent = body.message || 'Uploaded.';
+        await poll(body.uploadId);
+      } catch (err) {
+        msg.innerHTML = '<span class="err">' + (err.message || String(err)) + '</span>';
+        submit.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

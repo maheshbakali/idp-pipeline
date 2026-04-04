@@ -9,8 +9,10 @@ This folder provisions the Azure resources used by `project_idp_pipeline`.
 - **Azure OpenAI**: enrichment service (optionally creates a model deployment)
 - **Log Analytics**: Container Apps diagnostics
 - **Azure Container Apps Environment**
+- **Storage account**: blob container `uploads` (user uploads from the API + Azure Functions host state)
+- **Function App (Linux, Python 3.11)**: blob-triggered processor calling the same pipeline logic as `main.py`
 - **Container App**: runs the .NET API (`dotnet-api`)
-- **Container Apps Job**: runs the Python pipeline (`src/python_pipeline`)
+- **Container Apps Job**: optional manual batch pipeline (`src/python_pipeline`)
 
 ## Files
 
@@ -49,4 +51,6 @@ docker push <registry>/project1-idp-pipeline:1.0.0
 
 - **Azure OpenAI access**: OpenAI model deployments can fail if your subscription/region does not have access to the chosen model. If it fails, deploy the OpenAI account and create the deployment manually, then set `AZURE_OPENAI_DEPLOYMENT` accordingly.
 - **Cosmos partition key**: this project uses `partitionKey = docType` (e.g., `invoice`) and the container partition key path is `/partitionKey`.
+- **Function app code**: Bicep provisions the app and settings only. You must publish Python sources (see root `README.md`, “Azure Function”) so `function_app.py` and the `python_pipeline` package are deployed together.
+- **Template outputs**: `uploadStorageAccountName`, `functionAppNameOut`, and `functionAppDefaultHostName` identify the new resources after deployment.
 
