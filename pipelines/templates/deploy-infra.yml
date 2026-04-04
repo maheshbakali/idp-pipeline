@@ -22,10 +22,15 @@ parameters:
   - name: vmImage
     type: string
     default: ubuntu-latest
+  - name: dependsOn
+    type: object
+    default: []
 
 jobs:
   - deployment: Deploy_${{ parameters.environmentName }}
     displayName: Deploy infra (${{ parameters.environmentName }})
+    ${{ if ne(length(parameters.dependsOn), 0) }}:
+      dependsOn: ${{ parameters.dependsOn }}
     environment: ${{ parameters.environmentName }}
     pool:
       vmImage: ${{ parameters.vmImage }}

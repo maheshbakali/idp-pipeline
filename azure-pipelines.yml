@@ -49,7 +49,7 @@ stages:
     dependsOn: Build
     variables:
       - name: acrLoginServer
-        value: $[ stageDependencies.Build.BuildAndPush.outputs['BuildAndPush.acrLoginServer'] ]
+        value: $[ stageDependencies.Build.BuildAndPush.outputs['AcrLogin.acrLoginServer'] ]
       - name: apiImage
         value: '$(acrLoginServer)/$(apiRepository):$(imageTag)'
       - name: pipelineImage
@@ -70,7 +70,7 @@ stages:
     dependsOn: Dev
     variables:
       - name: acrLoginServer
-        value: $[ stageDependencies.Build.BuildAndPush.outputs['BuildAndPush.acrLoginServer'] ]
+        value: $[ stageDependencies.Build.BuildAndPush.outputs['AcrLogin.acrLoginServer'] ]
       - name: apiImage
         value: '$(acrLoginServer)/$(apiRepository):$(imageTag)'
       - name: pipelineImage
@@ -97,14 +97,15 @@ stages:
           bicepParamFile: infra/params/test.bicepparam
           apiImage: $(apiImage)
           pipelineImage: $(pipelineImage)
-        dependsOn: ApproveTest
+          dependsOn:
+            - ApproveTest
 
   - stage: Prod
     displayName: Deploy to Prod
     dependsOn: Test
     variables:
       - name: acrLoginServer
-        value: $[ stageDependencies.Build.BuildAndPush.outputs['BuildAndPush.acrLoginServer'] ]
+        value: $[ stageDependencies.Build.BuildAndPush.outputs['AcrLogin.acrLoginServer'] ]
       - name: apiImage
         value: '$(acrLoginServer)/$(apiRepository):$(imageTag)'
       - name: pipelineImage
@@ -131,5 +132,6 @@ stages:
           bicepParamFile: infra/params/prod.bicepparam
           apiImage: $(apiImage)
           pipelineImage: $(pipelineImage)
-        dependsOn: ApproveProd
+          dependsOn:
+            - ApproveProd
 

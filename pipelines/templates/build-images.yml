@@ -24,6 +24,7 @@ jobs:
       - checkout: self
 
       - task: AzureCLI@2
+        name: AcrLogin
         displayName: ACR login
         inputs:
           azureSubscription: ${{ parameters.azureServiceConnection }}
