@@ -1,4 +1,4 @@
-# Project 1: Intelligent Document Processing Pipeline
+# Project: Intelligent Document Processing Pipeline
 
 This project implements an end-to-end Intelligent Document Processing (IDP) pipeline:
 
@@ -242,5 +242,3 @@ Reusable templates live in `pipelines/templates/`.
 - Create an **Azure Resource Manager service connection** and set its name in the YAML as `AZURE-SC-NAME`.
 - Create / use an **Azure Container Registry** and set `acrName` (ACR resource name).
 - Create Azure DevOps **Environments** named `dev`, `test`, `prod` (you can add approvals/checks for Test/Prod).
-
-
