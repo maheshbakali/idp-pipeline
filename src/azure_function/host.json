@@ -18,5 +18,10 @@
     "id": "Microsoft.Azure.Functions.ExtensionBundle",
     "version": "[4.*, 5.0.0)"
   },
+  "extensions": {
+    "blobs": {
+      "maxPollingInterval": "00:00:02"
+    }
+  },
   "functionTimeout": "00:10:00"
 }

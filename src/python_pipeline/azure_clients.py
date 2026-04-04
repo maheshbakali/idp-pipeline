@@ -10,9 +10,11 @@ from config import Settings
 
 
 def create_document_intelligence_client(settings: Settings) -> DocumentIntelligenceClient:
+    endpoint = settings.document_intelligence_endpoint.strip().rstrip("/")
     return DocumentIntelligenceClient(
-        endpoint=settings.document_intelligence_endpoint,
+        endpoint=endpoint,
         credential=AzureKeyCredential(settings.document_intelligence_key),
+        api_version=settings.document_intelligence_api_version,
     )
 
 
@@ -39,6 +41,7 @@ def extract_with_document_intelligence(
     poller = client.begin_analyze_document(model_id=model_id, body=io.BytesIO(file_bytes))
     result = poller.result()
 
+    # prebuilt-layout often omits structured `documents`; layout still provides pages + content.
     documents = []
     for doc in result.documents or []:
         fields: dict[str, Any] = {}
@@ -63,7 +66,15 @@ def extract_with_document_intelligence(
             }
         )
 
-    return {"documents": documents, "pages": pages, "content": result.content}
+    content = result.content
+    if not content and result.paragraphs:
+        content = "\n\n".join(
+            p.content
+            for p in result.paragraphs
+            if p.content
+        )
+
+    return {"documents": documents, "pages": pages, "content": content}
 
 # The enrichment function that sends the extracted data to Azure OpenAI for further processing based on a provided prompt template.
 def enrich_with_gpt(

@@ -36,7 +36,18 @@ var blobConnection = builder.Configuration["Blob:ConnectionString"];
 var blobContainerName = builder.Configuration["Blob:ContainerName"] ?? "uploads";
 if (!string.IsNullOrWhiteSpace(blobConnection))
 {
-    builder.Services.AddSingleton(_ => new BlobServiceClient(blobConnection));
+    // Azurite often lags Azure Storage REST versions; the latest SDK defaults can trigger
+    // "API version … is not supported by Azurite". Use a broadly compatible version for local dev.
+    var blobUsesLocalEmulator =
+        blobConnection.Contains("UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase)
+        || (blobConnection.Contains("127.0.0.1", StringComparison.OrdinalIgnoreCase)
+            && blobConnection.Contains("BlobEndpoint", StringComparison.OrdinalIgnoreCase))
+        || (blobConnection.Contains("localhost", StringComparison.OrdinalIgnoreCase)
+            && blobConnection.Contains(":10000", StringComparison.OrdinalIgnoreCase));
+    var blobOptions = blobUsesLocalEmulator
+        ? new BlobClientOptions(BlobClientOptions.ServiceVersion.V2021_10_04)
+        : new BlobClientOptions();
+    builder.Services.AddSingleton(_ => new BlobServiceClient(blobConnection, blobOptions));
 }
 
 var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
@@ -223,6 +234,22 @@ app.MapPost("/documents/upload", async Task<IResult> (
 
         var blob = container.GetBlobClient(blobPath);
         await blob.UploadAsync(buffer, overwrite: true, cancellationToken);
+
+        // #region agent log
+        DebugAgentLog.Write(
+            "H2",
+            "Program.cs:documents/upload",
+            "blob_uploaded_after_put",
+            new Dictionary<string, object?>
+            {
+                ["container"] = blobContainerName,
+                ["blobPath"] = blobPath,
+                ["fullBlobPath"] = $"{blobContainerName}/{blobPath}",
+                ["accountName"] = blobClient.AccountName,
+                ["docType"] = docType,
+                ["uploadId"] = uploadId,
+            });
+        // #endregion
 
         var fullBlobPath = $"{blobContainerName}/{blobPath}";
         return Results.Accepted(

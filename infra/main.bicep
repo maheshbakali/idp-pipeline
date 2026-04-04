@@ -57,8 +57,8 @@ param azureOpenAIModelName string = 'gpt-4o'
 @description('Azure OpenAI model version for the deployment. Optional; set to match your region quota/model catalog.')
 param azureOpenAIModelVersion string = '2024-08-06'
 
-@description('Document Intelligence model ID used by the pipeline (e.g. prebuilt-document).')
-param documentIntelligenceModelId string = 'prebuilt-document'
+@description('Document Intelligence model ID used by the pipeline (e.g. prebuilt-layout).')
+param documentIntelligenceModelId string = 'prebuilt-layout'
 
 @description('Log Analytics retention in days.')
 @minValue(30)

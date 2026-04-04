@@ -20,7 +20,7 @@ param cosmosPartitionKeyPath = '/partitionKey'
 param cosmosFreeTier = true
 param cosmosConsistencyLevel = 'Session'
 
-param documentIntelligenceModelId = 'prebuilt-document'
+param documentIntelligenceModelId = 'prebuilt-layout'
 
 param azureOpenAIApiVersion = '2024-06-01'
 param azureOpenAIDeploymentName = 'gpt-4o'

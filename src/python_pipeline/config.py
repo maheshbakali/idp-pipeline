@@ -11,8 +11,12 @@ load_dotenv()
 class Settings:
     document_intelligence_endpoint: str = os.getenv("DOCUMENT_INTELLIGENCE_ENDPOINT", "")
     document_intelligence_key: str = os.getenv("DOCUMENT_INTELLIGENCE_KEY", "")
+    # v4 API: use prebuilt-layout for general PDF/images (prebuilt-document is not available on many resources).
     document_intelligence_model: str = os.getenv(
-        "DOCUMENT_INTELLIGENCE_MODEL", "prebuilt-document"
+        "DOCUMENT_INTELLIGENCE_MODEL", "prebuilt-layout"
+    )
+    document_intelligence_api_version: str = os.getenv(
+        "DOCUMENT_INTELLIGENCE_API_VERSION", "2024-11-30"
     )
 
     azure_openai_endpoint: str = os.getenv("AZURE_OPENAI_ENDPOINT", "")

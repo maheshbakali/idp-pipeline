@@ -10,7 +10,7 @@ param image string
 param documentIntelligenceEndpoint string
 @secure()
 param documentIntelligenceKey string
-param documentIntelligenceModelId string = 'prebuilt-document'
+param documentIntelligenceModelId string = 'prebuilt-layout'
 
 param azureOpenAIEndpoint string
 @secure()

@@ -126,9 +126,9 @@
     },
     "documentIntelligenceModelId": {
       "type": "string",
-      "defaultValue": "prebuilt-document",
+      "defaultValue": "prebuilt-layout",
       "metadata": {
-        "description": "Document Intelligence model ID used by the pipeline (e.g. prebuilt-document)."
+        "description": "Document Intelligence model ID used by the pipeline (e.g. prebuilt-layout)."
       }
     },
     "logAnalyticsRetentionDays": {
@@ -968,7 +968,7 @@
             },
             "documentIntelligenceModelId": {
               "type": "string",
-              "defaultValue": "prebuilt-document"
+              "defaultValue": "prebuilt-layout"
             },
             "azureOpenAIEndpoint": {
               "type": "string"
@@ -1342,7 +1342,7 @@
             },
             "documentIntelligenceModelId": {
               "type": "string",
-              "defaultValue": "prebuilt-document"
+              "defaultValue": "prebuilt-layout"
             },
             "azureOpenAIEndpoint": {
               "type": "string"
