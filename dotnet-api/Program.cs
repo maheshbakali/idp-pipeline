@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Cosmos;
 using Microsoft.OpenApi.Models;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -98,17 +100,20 @@ app.UseStaticFiles();
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "project1-api" }));
 
 /// Cross-partition lookup by Cosmos item id (recommended for clients).
+static IResult JsonDocumentResult(JObject doc) =>
+    Results.Content(doc.ToString(Formatting.None), "application/json; charset=utf-8");
+
 app.MapGet("/documents/{id}", async (string id, CosmosClient cosmosClient) =>
 {
     var container = cosmosClient.GetContainer(cosmosDatabase, cosmosContainerName);
     var query = new QueryDefinition("SELECT * FROM c WHERE c.id = @id").WithParameter("@id", id);
-    using var iterator = container.GetItemQueryIterator<dynamic>(query);
+    using var iterator = container.GetItemQueryIterator<JObject>(query);
 
     while (iterator.HasMoreResults)
     {
         var page = await iterator.ReadNextAsync();
         foreach (var doc in page)
-            return Results.Ok(doc);
+            return JsonDocumentResult(doc);
     }
 
     return Results.NotFound(new { message = "Document not found", id });
@@ -119,13 +124,13 @@ app.MapGet("/documents/by-upload/{uploadId}", async (string uploadId, CosmosClie
 {
     var container = cosmosClient.GetContainer(cosmosDatabase, cosmosContainerName);
     var query = new QueryDefinition("SELECT * FROM c WHERE c.uploadId = @u").WithParameter("@u", uploadId);
-    using var iterator = container.GetItemQueryIterator<dynamic>(query);
+    using var iterator = container.GetItemQueryIterator<JObject>(query);
 
     while (iterator.HasMoreResults)
     {
         var page = await iterator.ReadNextAsync();
         foreach (var doc in page)
-            return Results.Ok(doc);
+            return JsonDocumentResult(doc);
     }
 
     return Results.NotFound(new
@@ -147,16 +152,17 @@ app.MapGet("/documents", async (string? docType, CosmosClient cosmosClient) =>
     if (!string.IsNullOrWhiteSpace(docType))
         qd.WithParameter("@docType", docType);
 
-    var iterator = container.GetItemQueryIterator<dynamic>(qd);
-    var results = new List<dynamic>();
+    using var iterator = container.GetItemQueryIterator<JObject>(qd);
+    var results = new JArray();
 
     while (iterator.HasMoreResults)
     {
         var page = await iterator.ReadNextAsync();
-        results.AddRange(page.Resource);
+        foreach (var doc in page)
+            results.Add(doc);
     }
 
-    return Results.Ok(results);
+    return Results.Content(results.ToString(Formatting.None), "application/json; charset=utf-8");
 });
 
 app.MapPost("/documents/upload", async Task<IResult> (

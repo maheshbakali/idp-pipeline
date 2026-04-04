@@ -40,6 +40,7 @@
 
   <div class="card" id="resultCard" hidden>
     <h2 style="font-size:1rem;margin-top:0;">Processed document</h2>
+    <p id="summary" class="status" hidden style="margin-top:0;"></p>
     <pre id="out"></pre>
   </div>
 
@@ -47,8 +48,42 @@
     const form = document.getElementById('form');
     const msg = document.getElementById('msg');
     const out = document.getElementById('out');
+    const summaryEl = document.getElementById('summary');
     const resultCard = document.getElementById('resultCard');
     const submit = document.getElementById('submit');
+
+    function showProcessedPayload(rawText, contentType) {
+      var text = (rawText || '').trim();
+      if (!text) {
+        out.textContent = '(Empty response body from API.)';
+        summaryEl.hidden = true;
+        summaryEl.textContent = '';
+        return;
+      }
+      var data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        out.textContent = 'Response was not valid JSON (' + (contentType || 'unknown type') + '):\n\n' + text;
+        summaryEl.hidden = true;
+        summaryEl.textContent = '';
+        return;
+      }
+      if (data && typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length === 0) {
+        out.textContent = '{}';
+        summaryEl.hidden = true;
+        summaryEl.textContent = '';
+        return;
+      }
+      out.textContent = JSON.stringify(data, null, 2);
+      if (data && data.gptEnrichment && typeof data.gptEnrichment.summary === 'string' && data.gptEnrichment.summary.length) {
+        summaryEl.textContent = data.gptEnrichment.summary;
+        summaryEl.hidden = false;
+      } else {
+        summaryEl.hidden = true;
+        summaryEl.textContent = '';
+      }
+    }
 
     async function poll(uploadId) {
       const maxAttempts = 90;
@@ -56,8 +91,8 @@
       for (let i = 0; i < maxAttempts; i++) {
         const r = await fetch('/documents/by-upload/' + encodeURIComponent(uploadId));
         if (r.ok) {
-          const data = await r.json();
-          out.textContent = JSON.stringify(data, null, 2);
+          const raw = await r.text();
+          showProcessedPayload(raw, r.headers.get('content-type'));
           resultCard.hidden = false;
           msg.textContent = 'Processing complete.';
           submit.disabled = false;
