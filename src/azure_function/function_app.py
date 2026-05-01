@@ -22,7 +22,9 @@ for _p in (_here / "python_pipeline", _here.parent / "python_pipeline"):
             sys.path.insert(0, str(_p))
         break
 else:
-    raise ImportError("python_pipeline package not found next to or under the function app root")
+    raise ImportError(
+        "python_pipeline package not found next to or under the function app root"
+    )
 
 from pipeline_runner import process_document_from_bytes  # noqa: E402
 
@@ -102,7 +104,9 @@ def process_blob_upload(blob: func.InputStream) -> None:
     # endregion
     parts = rel_path.strip("/").split("/")
     if len(parts) < 3:
-        logger.error("Invalid blob path (expected docType/uploadId/fileName): %s", blob_path)
+        logger.error(
+            "Invalid blob path (expected docType/uploadId/fileName): %s", blob_path
+        )
         # region agent log
         _agent_log(
             "H3",
@@ -175,7 +179,11 @@ def process_blob_upload(blob: func.InputStream) -> None:
             "H5",
             "function_app.py:process_blob_upload:success",
             "pipeline_completed",
-            {"blob_path": blob_path, "upload_id": upload_id, "cosmos_id": str(processed.id)},
+            {
+                "blob_path": blob_path,
+                "upload_id": upload_id,
+                "cosmos_id": str(processed.id),
+            },
         )
         # endregion
     except Exception:

@@ -10,7 +10,8 @@ from config import Settings
 from models import ProcessedDocument, ProcessingMetadata, utc_now_iso
 from storage.cosmos_repository import CosmosRepository
 
-# DocumentProcessor orchestrates the processing of documents: it extracts content using Azure Document Intelligence, 
+
+# DocumentProcessor orchestrates the processing of documents: it extracts content using Azure Document Intelligence,
 # enriches it with Azure OpenAI, and stores the results in Cosmos DB.
 class DocumentProcessor:
     def __init__(self, settings: Settings) -> None:
@@ -18,9 +19,9 @@ class DocumentProcessor:
         self.doc_client = create_document_intelligence_client(settings)
         self.openai_client = create_azure_openai_client(settings)
         self.repo = CosmosRepository(settings)
-        self._prompt_template = (Path(__file__).parent / "prompts" / "enrichment_prompt.txt").read_text(
-            encoding="utf-8"
-        )
+        self._prompt_template = (
+            Path(__file__).parent / "prompts" / "enrichment_prompt.txt"
+        ).read_text(encoding="utf-8")
 
     def process_bytes(
         self,
