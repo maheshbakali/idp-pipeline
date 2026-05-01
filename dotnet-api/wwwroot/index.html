@@ -19,118 +19,17 @@
   </style>
 </head>
 <body>
-  <h1>Upload document</h1>
-  <p class="status">PDF, PNG, or JPEG — max 5&nbsp;MB. After upload, processing runs in Azure; results appear below when ready.</p>
+  <div id="root"></div>
 
-  <div class="card">
-    <form id="form">
-      <label for="docType">Document type</label>
-      <select id="docType" name="docType" required>
-        <option value="invoice">Invoice</option>
-        <option value="receipt">Receipt</option>
-        <option value="contract">Contract</option>
-        <option value="other">Other</option>
-      </select>
-      <label for="file">File</label>
-      <input id="file" name="file" type="file" accept=".pdf,.png,.jpg,.jpeg,image/png,image/jpeg,application/pdf" required />
-      <button type="submit" id="submit">Upload</button>
-    </form>
-    <div id="msg" class="status"></div>
-  </div>
+  <!-- React (no-build, UMD) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
-  <div class="card" id="resultCard" hidden>
-    <h2 style="font-size:1rem;margin-top:0;">Processed document</h2>
-    <p id="summary" class="status" hidden style="margin-top:0;"></p>
-    <pre id="out"></pre>
-  </div>
-
+  <!-- Reusable component -->
+  <script src="/idp-upload-widget.js"></script>
   <script>
-    const form = document.getElementById('form');
-    const msg = document.getElementById('msg');
-    const out = document.getElementById('out');
-    const summaryEl = document.getElementById('summary');
-    const resultCard = document.getElementById('resultCard');
-    const submit = document.getElementById('submit');
-
-    function showProcessedPayload(rawText, contentType) {
-      var text = (rawText || '').trim();
-      if (!text) {
-        out.textContent = '(Empty response body from API.)';
-        summaryEl.hidden = true;
-        summaryEl.textContent = '';
-        return;
-      }
-      var data;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        out.textContent = 'Response was not valid JSON (' + (contentType || 'unknown type') + '):\n\n' + text;
-        summaryEl.hidden = true;
-        summaryEl.textContent = '';
-        return;
-      }
-      if (data && typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length === 0) {
-        out.textContent = '{}';
-        summaryEl.hidden = true;
-        summaryEl.textContent = '';
-        return;
-      }
-      out.textContent = JSON.stringify(data, null, 2);
-      if (data && data.gptEnrichment && typeof data.gptEnrichment.summary === 'string' && data.gptEnrichment.summary.length) {
-        summaryEl.textContent = data.gptEnrichment.summary;
-        summaryEl.hidden = false;
-      } else {
-        summaryEl.hidden = true;
-        summaryEl.textContent = '';
-      }
-    }
-
-    async function poll(uploadId) {
-      const maxAttempts = 90;
-      const delayMs = 2000;
-      for (let i = 0; i < maxAttempts; i++) {
-        const r = await fetch('/documents/by-upload/' + encodeURIComponent(uploadId));
-        if (r.ok) {
-          const raw = await r.text();
-          showProcessedPayload(raw, r.headers.get('content-type'));
-          resultCard.hidden = false;
-          msg.textContent = 'Processing complete.';
-          submit.disabled = false;
-          return;
-        }
-        if (r.status !== 404) {
-          const t = await r.text();
-          throw new Error(t || r.statusText);
-        }
-        msg.textContent = 'Waiting for processing… (' + (i + 1) + '/' + maxAttempts + ')';
-        await new Promise(function (res) { setTimeout(res, delayMs); });
-      }
-      msg.innerHTML = '<span class="err">Timed out waiting for processing. Check Azure Function logs and Cosmos DB.</span>';
-      submit.disabled = false;
-    }
-
-    form.addEventListener('submit', async function (e) {
-      e.preventDefault();
-      msg.textContent = '';
-      resultCard.hidden = true;
-      submit.disabled = true;
-      const fd = new FormData();
-      fd.append('docType', document.getElementById('docType').value);
-      fd.append('file', document.getElementById('file').files[0]);
-
-      try {
-        const res = await fetch('/documents/upload', { method: 'POST', body: fd });
-        const body = await res.json().catch(function () { return {}; });
-        if (!res.ok) {
-          throw new Error(body.message || res.statusText || String(res.status));
-        }
-        msg.textContent = body.message || 'Uploaded.';
-        await poll(body.uploadId);
-      } catch (err) {
-        msg.innerHTML = '<span class="err">' + (err.message || String(err)) + '</span>';
-        submit.disabled = false;
-      }
-    });
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(window.IdpUploadWidget));
   </script>
 </body>
 </html>
